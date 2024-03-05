@@ -1,0 +1,166 @@
+# Define provider and region
+provider "aws" {
+  region = "us-east-1" # Change this to your desired region
+}
+
+# Create VPC
+
+resource "aws_vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16" # You can adjust the CIDR block
+tags = {
+        Name = "AWS 3 Tier Architecture"
+}
+}
+# Create public subnets
+resource "aws_subnet" "Public-Web-Subnet-AZ-1" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.1.0/24" # Change this as needed
+  availability_zone = "us-east-1a"  # Change this as needed
+  tags = {
+        Name = "Public-Web-Subnet-AZ-1"
+}
+}
+
+resource "aws_subnet" "Public-Web-Subnet-AZ-2" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.2.0/24" # Change this as needed
+  availability_zone = "us-east-1b"  # Change this as needed
+    tags = {
+        Name = "Public-Web-Subnet-AZ-1"
+    }
+}
+
+# Create private subnets
+resource "aws_subnet" "Private-App-Subnet-AZ-1" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.3.0/24" # Change this as needed
+  availability_zone = "us-east-1a"  # Change this as needed
+  tags = {
+        Name = "Private-App-Subnet-AZ-1"
+    }
+}
+
+resource "aws_subnet" "Private-App-Subnet-AZ-2" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.4.0/24" # Change this as needed
+  availability_zone = "us-east-1b"  # Change this as needed
+  tags = {
+        Name = "Private-App-Subnet-AZ-2"
+    }
+}
+
+resource "aws_subnet" "Private-DB-Subnet-AZ-1" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.5.0/24" # Change this as needed
+  availability_zone = "us-east-1a"  # Change this as needed
+tags = {
+        Name = "Private-DB-Subnet-AZ-1"
+    }
+
+}
+
+resource "aws_subnet" "Private-DB-Subnet-AZ-2" {
+  vpc_id            = aws_vpc.my_vpc.id
+  cidr_block        = "10.0.6.0/24" # Change this as needed
+  availability_zone = "us-east-1b"  # Change this as needed
+  tags = {
+        Name = "Private-DB-Subnet-AZ-2"
+    }
+}
+
+# Create Internet Gateway
+resource "aws_internet_gateway" "my_igw" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+        Name = "My IGW"
+    }
+}
+
+# Create Elastic IP -1
+resource "aws_eip" "my_eip1" {
+  vpc = true
+}
+
+# Create Elastic IP -2
+resource "aws_eip" "my_eip2" {
+  vpc = true
+}
+
+# Create NAT Gateway's
+resource "aws_nat_gateway" "my_nat_gateway" {
+  allocation_id = aws_eip.my_eip1.id
+  subnet_id     = aws_subnet.Public-Web-Subnet-AZ-1.id
+  tags = {
+        Name = "my_nat_gateway_AZ1"
+    }
+}
+
+resource "aws_nat_gateway" "my_nat_gateway2" {
+  allocation_id = aws_eip.my_eip2.id
+  subnet_id     = aws_subnet.Public-Web-Subnet-AZ-2.id
+  tags = {
+        Name = "my_nat_gateway_AZ2"
+    }
+}
+
+# Create Route Tables
+resource "aws_route_table" "public_route_table" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+        Name = "public_route_table"
+    }
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.my_igw.id
+  }
+}
+
+resource "aws_route_table" "private_route_table_AZ1" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+        Name = "private_route_table_AZ1"
+    }
+}
+
+resource "aws_route_table" "private_route_table_AZ2" {
+  vpc_id = aws_vpc.my_vpc.id
+  tags = {
+        Name = "private_route_table_AZ2"
+    }
+}
+
+# Associate subnets with route tables
+resource "aws_route_table_association" "Public-Web-Subnet-AZ-1" {
+  subnet_id      = aws_subnet.Public-Web-Subnet-AZ-1.id
+  route_table_id = aws_route_table.public_route_table.id
+}
+
+resource "aws_route_table_association" "Public-Web-Subnet-AZ-2" {
+  subnet_id      = aws_subnet.Public-Web-Subnet-AZ-2.id
+  route_table_id = aws_route_table.public_route_table.id
+}
+
+resource "aws_route_table_association" "Private-App-Subnet-AZ-1" {
+  subnet_id      = aws_subnet.Private-App-Subnet-AZ-1.id
+  route_table_id = aws_route_table.private_route_table_AZ1.id
+}
+
+resource "aws_route_table_association" "Private-App-Subnet-AZ-2" {
+  subnet_id      = aws_subnet.Private-App-Subnet-AZ-2.id
+  route_table_id = aws_route_table.private_route_table_AZ2.id
+}
+
+# Create Route for Private Subnet to NAT Gateway
+resource "aws_route" "private_route_table_AZ1" {
+  route_table_id         = aws_route_table.private_route_table_AZ1.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.my_nat_gateway.id
+}
+
+resource "aws_route" "private_route_table_AZ2" {
+  route_table_id         = aws_route_table.private_route_table_AZ2.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.my_nat_gateway2.id
+}
+
